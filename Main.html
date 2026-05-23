@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>GPS Inclusivo CDMX</title>
+
+<style>
+body {
+  font-family: Arial;
+  background: #0f172a;
+  color: white;
+  text-align: center;
+}
+
+.container {
+  max-width: 400px;
+  margin: auto;
+}
+
+input, button {
+  padding: 10px;
+  margin: 5px;
+  width: 90%;
+  border-radius: 10px;
+}
+
+button {
+  background: #22c55e;
+  border: none;
+  cursor: pointer;
+}
+
+.hidden {
+  display: none;
+}
+
+.card {
+  background: #1e293b;
+  padding: 15px;
+  margin-top: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.map {
+  background: #334155;
+  height: 120px;
+  border-radius: 10px;
+  margin: 10px;
+}
+
+.alert {
+  color: #facc15;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<!-- LOGIN -->
+<div id="login">
+  <h2>🔐 Iniciar sesión</h2>
+  <input id="nombre" placeholder="Nombre">
+  <input id="correo" placeholder="Correo">
+  <button onclick="guardarUsuario()">Entrar</button>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+
+<h2 id="saludo"></h2>
+
+<input placeholder="Origen">
+<input placeholder="Destino">
+
+<label>
+  <input type="checkbox" id="accesible">
+  ♿ Modo accesible
+</label>
+
+<button onclick="buscarRuta()">Buscar ruta</button>
+
+<div class="map">
+  🗺️ Línea Metro / MB / Trole (simulado)
+</div>
+
+<div id="alerta"></div>
+<div id="resultados"></div>
+<div id="seguimiento"></div>
+
+</div>
+
+</div>
+
+<script>
+
+// 🧠 ==== LOGIN + PERSISTENCIA ====
+
+function guardarUsuario(){
+  const nombre = document.getElementById("nombre").value;
+  const correo = document.getElementById("correo").value;
+
+  localStorage.setItem("nombre", nombre);
+  localStorage.setItem("correo", correo);
+
+  iniciarApp();
+}
+
+function iniciarApp(){
+  const nombre = localStorage.getItem("nombre");
+
+  document.getElementById("login").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+
+  document.getElementById("saludo").innerText =
+  "👋 Hola " + nombre;
+}
+
+// Auto-login
+if(localStorage.getItem("nombre")){
+  iniciarApp();
+}
+
+// 📊 ==== DATOS SIMULADOS ====
+
+const rutas = [
+  {
+    nombre: "Ruta rápida",
+    tiempo: 80,
+    costo: 8,
+    flujo: 9,
+    pasos: [
+      {icono:"🚇", texto:"Sube en Pantitlán"},
+      {icono:"🚇", texto:"Baja en Hidalgo"},
+      {icono:"🚶", texto:"Camina 5 min"}
+    ]
+  },
+  {
+    nombre: "Ruta accesible",
+    tiempo: 95,
+    costo: 10,
+    flujo: 5,
+    pasos: [
+      {icono:"🚇", texto:"Sube en Pantitlán"},
+      {icono:"🛗", texto:"Usa elevador en Hidalgo"},
+      {icono:"🚌", texto:"Toma MB"}
+    ]
+  }
+];
+
+// 🧠 ==== IA ADAPTATIVA ====
+
+function IA_recomendar(accesible){
+
+  const nombre = localStorage.getItem("nombre");
+
+  let mejorRuta = rutas[0];
+
+  rutas.forEach(r => {
+
+    // lógica de decisión
+    let score = 0;
+
+    score += (100 - r.tiempo);
+    score += (10 - r.flujo) * 5;
+
+    if(accesible && r.nombre.includes("accesible")){
+      score += 100;
+    }
+
+    if(score > (mejorRuta.score || 0)){
+      mejorRuta = {...r, score};
+    }
+  });
+
+  return mejorRuta;
+}
+
+// 🔎 Buscar rutas
+function buscarRuta(){
+
+  const accesible = document.getElementById("accesible").checked;
+
+  if(accesible){
+    document.getElementById("alerta").innerHTML =
+    "<p class='alert'>⚠️ Ajustando rutas para evitar barreras</p>";
+  }
+
+  pintarRutas(rutas, accesible);
+
+}
+
+// 📱 Mostrar rutas
+function pintarRutas(lista, accesible){
+
+  const contenedor = document.getElementById("resultados");
+  contenedor.innerHTML = "";
+
+  const recomendada = IA_recomendar(accesible);
+
+  lista.forEach(r => {
+
+    const isBest = r.nombre === recomendada.nombre;
+
+    contenedor.innerHTML += `
+      <div class="card" onclick="seleccionarRuta('${r.nombre}')">
+        <h3>${r.nombre} ${isBest ? "⭐" : ""}</h3>
+        <p>⏱ ${r.tiempo} min</p>
+        <p>💰 ${r.costo} MXN / ${(r.costo/20).toFixed(2)} USD</p>
+        <p>👥 Flujo: ${r.flujo}/10</p>
+      </div>
+    `;
+  });
+
+}
+
+// ✅ Selección
+function seleccionarRuta(nombre){
+
+  const ruta = rutas.find(r => r.nombre === nombre);
+
+  alert("🤖 Te recomendamos esta ruta por mejor balance de tiempo, flujo y accesibilidad");
+
+  mostrarSeguimiento(ruta);
+}
+
+// 📍 Seguimiento dinámico
+function mostrarSeguimiento(ruta){
+
+  const contenedor = document.getElementById("seguimiento");
+
+  let pasosHTML = "";
+
+  ruta.pasos.forEach(p => {
+    pasosHTML += `<p>${p.icono} ${p.texto}</p>`;
+  });
+
+  contenedor.innerHTML = `
+    <h3>📍 Seguimiento en tiempo real</h3>
+    <p>⏱ ${ruta.tiempo} min</p>
+    <p>💰 ${ruta.costo} MXN</p>
+    ${pasosHTML}
+    <button onclick="cambiarRuta()">Cambiar ruta</button>
+  `;
+}
+
+// 🔄 Cambio de ruta (dinámico)
+function cambiarRuta(){
+  alert("⚠️ Detectamos congestión, nueva ruta generada");
+}
+
+</script>
+
+</body>
+</html>
+``
